@@ -1,25 +1,147 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "Nirav Desai"
+date: "December 18, 2015"
+output: html_document
 ---
+In this assignment we begin by loading the activity monitoring data into our workspace. In the first half of the analysis, we omit the NA values from the data frame using na.omit. we inspect the head of the data and plot a summary to get an idea of how the data set looks.
+
+```{r}
+walking_data<-read.csv("data/activity.csv",header=TRUE)
+walking_data <- na.omit(as.data.frame(walking_data))
+
+head(walking_data)
+summary(walking_data)
+
+```
+We transform the date into a factor variable with levels of individual dates. This grouping helps in aggregating step values for the analysis.
+
+```{r}
+
+walking_data <- transform(walking_data, date = factor(as.Date(date)))
+
+```
+Next we have to analyze the total number of steps taken per day. We use the tapply function and sum the total number of steps on a given date. The results are plotted in the histogram.
+```{r}
+##histogram of total steps per day
+step_count <- tapply(walking_data$steps, walking_data$date, sum)
+summary(step_count)
 
 
-## Loading and preprocessing the data
+hist(step_count, col="blue", breaks=50, xlab="Step Count", main="Histogram of total steps per day")
+rug(step_count)
+
+```
+
+The mean and the median of the distribution of the total number of steps per day is calculated next.
+
+```{r}
+##mean and median of total steps per day
+mean_steps = mean(step_count)
+mean_steps
+median_steps = median(step_count)
+median_steps
+
+```
+For the average daily activity pattern, we find the average number of steps in a given 5 minute time interval across all the days. This average is plotted in the next graph. We use the plyr library to calculate the mean for each time interval.
+
+```{r}
+library(plyr)
+
+step_count_interval <- ddply(walking_data,.(interval),summarize, mean=mean(steps))
+plot(step_count_interval$interval, step_count_interval$mean, type="n", main="Interval Frequency at which steps are taken")
+
+lines(step_count_interval$interval, step_count_interval$mean, type="l")
+
+```
+
+The time interval with the highest frequency is calculated next.
+```{r}
+
+freq_interval <- step_count_interval[which(step_count_interval$mean==max(step_count_interval$mean)),]
+
+freq_interval
+```
+In the second half of the assignment, we try to impute the missing values with mean value for a given time interval. First we calculate the total number of NA values by reading the original dataset.
+
+```{r}
+walking_data2<-read.csv("data/activity.csv",header=TRUE)
+walking_data2 <- (as.data.frame(walking_data2))
+
+summary(walking_data2)
+```
+2304 NA values are reported in this set.
+
+We now create a new data set that replaces the missing NA values with the mean for the given time interval.
+
+```{r}
+library(plyr)
+mean_step_count <- ddply(walking_data,.(date),summarize, mean=mean(steps, na.rm=TRUE))
+mean_steps = array(0, dim=c(nrow(walking_data2)))
+for (j in 1:nrow(walking_data2))
+{
+  if (is.na(walking_data2[j,1]))
+  {
+      
+      mean_steps[j] = step_count_interval[which(step_count_interval$interval==walking_data2[j,]$interval),]$mean
+      walking_data2[j,1]<-mean_steps[j];
+  }
+    
+}
+step_count2 <- tapply(walking_data2$steps, walking_data2$date, sum)
+summary(step_count2)
 
 
+hist(step_count2, col="blue", breaks=50, xlab="Step Count", main="Histogram of total steps per day")
+rug(walking_data2$steps)
 
-## What is mean total number of steps taken per day?
+```
+The  mean and median number of steps per day are calculated for this new data set with imputed values.
+
+```{r}
+mean_steps2 = mean(step_count2)
+mean_steps2
+
+median_steps2 = median(step_count2)
+median_steps2
+```
+we have imputed values of the mean of a given time interval and so the mean value has not changed. 
+
+We next try to analyze the difference in activity on weekdays and weekends.
+
+```{r}
+
+##weekdays variable added
+
+walking_data2 <- transform(walking_data2, date=as.Date(date))
+days <- weekdays((walking_data2$date))
+
+walking_data2 <- cbind(walking_data2, days)
+
+library(dplyr)
+
+walking_data2 <- mutate(walking_data2, daytype=factor(1*(days %in% c("Saturday","Sunday")),labels=c("Weekday","Weekend")))
+
+##chicago <- mutate(chicago,tempcat = factor(1 * (tmpd > 80),labels = c("cold", "hot")))
+
+walking_data_weekend <- walking_data2[walking_data2$daytype=="Weekend",]
+
+walking_data_weekday <- walking_data2[walking_data2$daytype=="Weekday",]
 
 
+library(plyr)
 
-## What is the average daily activity pattern?
+step_count_interval2 <- ddply(walking_data_weekend,.(interval),summarize, mean=mean(steps, na.rm=TRUE))
 
-
-
-## Imputing missing values
-
+step_count_interval3 <- ddply(walking_data_weekday,.(interval),summarize, mean=mean(steps, na.rm=TRUE))
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+par(mfrow=c(2,1), mar=c(4,1,3,1))
+plot(step_count_interval2$interval, step_count_interval2$mean, type="n", xlab="Step Count",ylab="Frequency", main="Interval Frequency at which steps are taken on weekends")
+lines(step_count_interval2$interval, step_count_interval2$mean, type="l")
+
+plot(step_count_interval3$interval, step_count_interval3$mean, type="n", xlab="Step Count",ylab="Frequency", main="Interval Frequency at which steps are taken on weekdays")
+lines(step_count_interval3$interval, step_count_interval3$mean, type="l")
+```
+
+
